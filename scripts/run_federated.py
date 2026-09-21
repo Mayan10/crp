@@ -102,6 +102,24 @@ def main() -> int:
             alpha=cfg.partition.alpha, seed=cfg.seed,
             min_samples_per_client=cfg.partition.min_samples_per_client,
         )
+    elif cfg.federated.train_subset_size:
+        # Legacy reproduction only. The original protocol distributed a small
+        # subset of the train split across clients rather than all of it, which
+        # is one of the two reasons its federated model stayed close to the
+        # centralized one it was initialized from.
+        train = load_split(cfg.data.splits_dir, "train", with_class_names=False)
+        subset = train.sample(
+            n=min(cfg.federated.train_subset_size, len(train)), random_state=cfg.seed
+        ).reset_index(drop=True)
+        partition, _ = build_partition(
+            subset, cfg.partition.scheme, cfg.partition.num_clients,
+            alpha=cfg.partition.alpha, seed=cfg.partition.seed,
+            min_samples_per_client=cfg.partition.min_samples_per_client,
+        )
+        print(
+            f"legacy protocol: {len(subset)} of {len(train)} training images distributed "
+            f"({100 * len(subset) / len(train):.1f} percent)\n"
+        )
     else:
         partition = load_partition(
             cfg.data.splits_dir, cfg.partition.scheme, cfg.partition.num_clients,
@@ -137,6 +155,7 @@ def main() -> int:
         "rounds": cfg.federated.rounds,
         "local_epochs": cfg.federated.local_epochs,
         "init": cfg.federated.init,
+        "train_subset_size": cfg.federated.train_subset_size,
         "seed": cfg.seed,
     }
 

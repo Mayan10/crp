@@ -73,8 +73,16 @@ def build_loader(
     num_workers: int = 4,
     seed: Optional[int] = None,
     drop_last: bool = False,
+    persistent_workers: bool = False,
 ) -> DataLoader:
-    """DataLoader with a seeded generator, so shuffling is reproducible."""
+    """DataLoader with a seeded generator, so shuffling is reproducible.
+
+    Workers are not persistent by default. A federated round builds one loader
+    per client, so persistent workers would hold K times `num_workers`
+    processes alive at once (20 for five clients with four workers each),
+    which exhausts memory on a modest machine long before it speeds anything
+    up. Only long lived loaders, such as validation, ask for persistence.
+    """
     generator = None
     if shuffle and seed is not None:
         generator = torch.Generator()
@@ -87,7 +95,7 @@ def build_loader(
         pin_memory=False,
         generator=generator,
         drop_last=drop_last,
-        persistent_workers=num_workers > 0,
+        persistent_workers=persistent_workers and num_workers > 0,
     )
 
 
