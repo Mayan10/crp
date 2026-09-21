@@ -1,0 +1,18 @@
+{
+  "measurement": {
+    "what": "one federated round, K=5 clients, E=1 local epoch over the 43,447 image train split, plus a full validation pass over 5,430 images",
+    "seconds": 638.0,
+    "config": "configs/fedavg_iid.yaml with federated.rounds=1, data.num_workers=2",
+    "device": "mps",
+    "hardware": "Apple M2, 8 GB, MacBook Air",
+    "source_log": "runs/federated/fedavg_iid_K5_seed0/history.csv"
+  },
+  "projection_local": {
+    "one_federated_run_hours": 5.316666666666666,
+    "core_federated_grid_hours": 127.6,
+    "centralized_all_seeds_hours": 10.633333333333333,
+    "total_hours": 138.23333333333332,
+    "note": "One centralized epoch costs about the same as one federated round: both are a single pass over the whole train split plus a validation pass."
+  },
+  "note": "Colab timings are measured on the runtime itself by step 6 of notebooks/run_grid_colab.ipynb rather than extrapolated here."
+}

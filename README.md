@@ -135,14 +135,22 @@ before committing to it.
 
 Measured on the hardware noted, for MobileNetV2 at 224x224, batch 32.
 
-| Stage | Apple M2, 8 GB (MPS) | Colab T4 |
-|---|---|---|
-| One federated round (K=5, E=1, one pass over 43,447 images plus validation) | see `results/timing.json` | see notebook step 6 |
-| One federated run (30 rounds) | 30 x the above | 30 x the above |
-| Core grid (3 centralized runs plus 24 federated runs) | not practical | measure first |
+| Stage | Apple M2, 8 GB (MPS), measured |
+|---|---|
+| One federated round (K=5, E=1, one pass over 43,447 images plus validation) | 10.6 min |
+| One federated run (30 rounds) | 5.3 h |
+| Centralized, 3 seeds x 20 epochs | 11 h |
+| Core grid, 24 federated runs | 128 h |
+| Everything | about 138 h |
 
-The Colab notebook measures one round on the actual runtime and prints the
-projected total, which is more reliable than any figure quoted here.
+The measurement behind these is in `results/timing.json`. A centralized epoch
+costs about the same as a federated round, since both are one pass over the
+whole train split plus a validation pass.
+
+The core grid is not practical on a laptop. Run it on a GPU: step 6 of
+`notebooks/run_grid_colab.ipynb` times one round on the actual runtime and
+prints the projected total for that machine, which is more reliable than
+extrapolating from the table above.
 
 ## Repository layout
 
