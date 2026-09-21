@@ -1,0 +1,15 @@
+# Python 3.10 or newer.
+torch==2.4.1
+torchvision==0.19.1
+flwr[simulation]==1.11.1
+captum==0.7.0
+scikit-learn==1.5.2
+scipy==1.14.1
+pandas==2.2.3
+numpy==1.26.4
+matplotlib==3.9.2
+pyyaml==6.0.2
+opencv-python-headless==4.10.0.84
+imagehash==4.3.1
+pillow==10.4.0
+pytest==8.3.3

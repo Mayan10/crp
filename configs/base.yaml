@@ -1,0 +1,67 @@
+# Shared defaults. Experiment configs set `base: base.yaml` and override
+# only what they change.
+name: base
+seed: 0
+device: auto
+runs_dir: runs
+results_dir: results
+
+data:
+  root: plantvillage dataset
+  variant: color
+  segmented_variant: segmented
+  image_size: 224
+  splits_dir: splits
+  split_seed: 42
+  train_fraction: 0.8
+  val_fraction: 0.1
+  test_fraction: 0.1
+  batch_size: 32
+  num_workers: 4
+
+model:
+  name: mobilenet_v2
+  num_classes: 38
+  pretrained: true
+
+centralized:
+  epochs: 20
+  optimizer: adam
+  lr: 0.001
+  lr_step_size: 7
+  lr_gamma: 0.1
+
+partition:
+  scheme: dirichlet
+  num_clients: 5
+  alpha: 0.5
+  min_samples_per_client: 10
+  seed: 0
+
+federated:
+  strategy: fedavg
+  rounds: 30
+  local_epochs: 1
+  mu: 0.01
+  optimizer: sgd
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 0.0
+  fraction_fit: 1.0
+  init: imagenet
+  init_checkpoint: null
+  train_subset_size: null
+
+xai:
+  methods: [gradcam, smoothgrad]
+  images_per_class: 10
+  smoothgrad_samples: 20
+  smoothgrad_noise_fraction: 0.1
+  occlusion_step: 0.02
+  topk_fraction: 0.2
+  bootstrap_resamples: 1000
+
+eval:
+  bootstrap_resamples: 1000
+  bootstrap_seed: 42
+  confidence: 0.95

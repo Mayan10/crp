@@ -1,0 +1,10 @@
+data/raw/
+runs/
+plantvillage dataset/
+*.pt
+*.pth
+*.ckpt
+__pycache__/
+.ipynb_checkpoints/
+.env
+kaggle.json
