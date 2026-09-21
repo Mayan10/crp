@@ -1,0 +1,17 @@
+# FedAvg under Dirichlet label skew. Sweep alpha with
+#   --set partition.alpha=0.1
+base: base.yaml
+name: fedavg_noniid
+seed: 0
+
+partition:
+  scheme: dirichlet
+  num_clients: 5
+  alpha: 0.5
+  seed: 0
+
+federated:
+  strategy: fedavg
+  rounds: 30
+  local_epochs: 1
+  init: imagenet

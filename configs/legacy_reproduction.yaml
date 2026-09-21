@@ -1,0 +1,24 @@
+# Reproduction of the original protocol, kept so the corrected numbers can be
+# compared against it directly.
+#
+# Two defects are deliberately preserved here: every client starts from the
+# centralized model that already saw the whole training set, and only a small
+# subset of the train split is distributed to clients. Both are the reason the
+# original federated accuracy sat near the centralized model.
+base: base.yaml
+name: legacy_reproduction
+seed: 0
+
+partition:
+  scheme: dirichlet
+  num_clients: 5
+  alpha: 0.5
+  seed: 0
+
+federated:
+  strategy: fedavg
+  rounds: 5
+  local_epochs: 1
+  init: checkpoint
+  init_checkpoint: runs/centralized/centralized_seed0/best.pt
+  train_subset_size: 5000

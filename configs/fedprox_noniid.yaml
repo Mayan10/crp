@@ -1,0 +1,18 @@
+# FedProx under Dirichlet label skew. mu is selected on validation accuracy
+# at alpha 0.1 before this configuration is run across alphas and seeds.
+base: base.yaml
+name: fedprox_noniid
+seed: 0
+
+partition:
+  scheme: dirichlet
+  num_clients: 5
+  alpha: 0.5
+  seed: 0
+
+federated:
+  strategy: fedprox
+  mu: 0.01
+  rounds: 30
+  local_epochs: 1
+  init: imagenet

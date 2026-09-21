@@ -1,0 +1,17 @@
+# FedAvg on a uniform random split of the train data across clients.
+# This is the low heterogeneity reference point, not an upper bound: it is
+# reported alongside the centralized model rather than assumed to match it.
+base: base.yaml
+name: fedavg_iid
+seed: 0
+
+partition:
+  scheme: iid
+  num_clients: 5
+  seed: 0
+
+federated:
+  strategy: fedavg
+  rounds: 30
+  local_epochs: 1
+  init: imagenet
