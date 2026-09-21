@@ -38,6 +38,8 @@ def verdict_row(claim: str, evidence: str, source: str, verdict: str) -> dict:
 
 
 def lookup(table: pd.DataFrame, label: str) -> pd.Series | None:
+    if table.empty or "label" not in table.columns:
+        return None
     match = table[table["label"] == label]
     return match.iloc[0] if len(match) else None
 
@@ -51,7 +53,8 @@ def significance_for(significance: pd.DataFrame, a: str, b: str) -> pd.Series | 
 
 def build_claim_audit(table: pd.DataFrame, significance: pd.DataFrame, xai: pd.DataFrame) -> list[dict]:
     """One row per claim from the original paper, decided from the new numbers."""
-    rows = []
+    rows: list[dict] = []
+    has_runs = not table.empty and "label" in table.columns
     centralized = lookup(table, "centralized")
     iid = lookup(table, "fedavg IID")
 
@@ -79,7 +82,10 @@ def build_claim_audit(table: pd.DataFrame, significance: pd.DataFrame, xai: pd.D
             "results/tables/main_results.csv, significance_tests.csv", outcome))
 
     # Claim 2: non-IID reduces FedAvg accuracy and precision.
-    fedavg_alphas = table[(table["strategy"] == "fedavg") & table["alpha"].notna()]
+    fedavg_alphas = (
+        table[(table["strategy"] == "fedavg") & table["alpha"].notna()]
+        if has_runs else pd.DataFrame()
+    )
     if iid is not None and not fedavg_alphas.empty:
         hardest = fedavg_alphas.sort_values("alpha").iloc[0]
         acc_drop = iid["accuracy_mean"] - hardest["accuracy_mean"]
@@ -96,7 +102,8 @@ def build_claim_audit(table: pd.DataFrame, significance: pd.DataFrame, xai: pd.D
 
     # Claim 3: FedProx recovers accuracy and precision under non-IID data.
     recovered, tested = [], []
-    for alpha in sorted(fedavg_alphas["alpha"].unique()):
+    alphas = sorted(fedavg_alphas["alpha"].unique()) if not fedavg_alphas.empty else []
+    for alpha in alphas:
         avg = lookup(table, f"fedavg alpha={alpha:g}")
         prox = table[(table["strategy"] == "fedprox") & (table["alpha"] == alpha)]
         if avg is None or prox.empty:
@@ -121,7 +128,7 @@ def build_claim_audit(table: pd.DataFrame, significance: pd.DataFrame, xai: pd.D
             "results/tables/main_results.csv, significance_tests.csv", outcome))
 
     # Claims 4 to 6 come from the XAI table.
-    if not xai.empty:
+    if not xai.empty and "leaf_energy_ratio" in xai.columns:
         leaf = xai[xai["leaf_energy_ratio"].notna()]
         if not leaf.empty:
             mean_ratio = leaf["leaf_energy_ratio"].mean()
