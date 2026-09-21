@@ -1,0 +1,27 @@
+class_name,median_coverage,n_empty,n_images
+Tomato___Tomato_mosaic_virus,0.0,6,10
+Tomato___Spider_mites Two-spotted_spider_mite,0.009088010204081632,1,10
+Tomato___Target_Spot,0.01207748724489796,0,10
+Apple___Black_rot,0.01358219068877551,0,10
+Tomato___Leaf_Mold,0.01509685905612245,0,10
+Apple___Apple_scab,0.017697704081632654,0,10
+Squash___Powdery_mildew,0.02743343431122449,0,10
+Grape___Black_rot,0.03072185905612245,0,10
+Cherry_(including_sour)___Powdery_mildew,0.043596540178571425,1,10
+"Pepper,_bell___Bacterial_spot",0.045599489795918366,0,10
+Tomato___Bacterial_spot,0.04998405612244898,1,10
+Peach___Bacterial_spot,0.052415497448979595,0,10
+Tomato___Tomato_Yellow_Leaf_Curl_Virus,0.06539979272959184,0,10
+Tomato___Late_blight,0.07664022640306123,0,10
+Apple___Cedar_apple_rust,0.07769650829081633,0,10
+Grape___Esca_(Black_Measles),0.09802495216836735,0,10
+Potato___Late_blight,0.1084881218112245,0,10
+Tomato___Early_blight,0.1158920599489796,0,10
+Tomato___Septoria_leaf_spot,0.12023676658163265,1,10
+Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot,0.2173648756377551,0,10
+Corn_(maize)___Northern_Leaf_Blight,0.24531648596938777,0,10
+Potato___Early_blight,0.2575135522959184,0,10
+Corn_(maize)___Common_rust_,0.2858836894132653,0,10
+Grape___Leaf_blight_(Isariopsis_Leaf_Spot),0.34152782206632654,0,10
+Orange___Haunglongbing_(Citrus_greening),0.4030711894132653,0,10
+Strawberry___Leaf_scorch,0.49539620535714285,0,10

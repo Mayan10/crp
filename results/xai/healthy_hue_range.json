@@ -1,0 +1,14 @@
+{
+  "hue_low": 39.0,
+  "hue_high": 83.0,
+  "hue_median": 55.0,
+  "saturation_median": 76.0,
+  "value_median": 120.0,
+  "n_images_sampled": 200,
+  "n_pixels": 6068737,
+  "percentiles": [
+    5.0,
+    95.0
+  ],
+  "note": "OpenCV hue is on a 0 to 179 scale. Leaf pixels whose hue falls outside this range are treated as lesion tissue. This is a colour heuristic, not an annotation."
+}

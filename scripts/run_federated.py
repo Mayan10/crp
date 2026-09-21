@@ -62,22 +62,18 @@ def main() -> int:
     parser.add_argument("--set", nargs="*", default=[])
     args = parser.parse_args()
 
-    overrides = list(args.set)
+    # Smoke settings go in first so an explicit --set still wins over them.
+    # Random init also keeps the smoke path hermetic: it exercises every stage
+    # without needing the ImageNet weights download.
+    smoke_overrides = [
+        "federated.rounds=2", "federated.local_epochs=1", "partition.num_clients=2",
+        "model.num_classes=2", "model.pretrained=false", "data.num_workers=0",
+        "data.batch_size=16", "device=cpu",
+    ]
+    overrides = (smoke_overrides if args.smoke else []) + list(args.set)
     if args.seed is not None:
         overrides.append(f"seed={args.seed}")
     cfg = load_config(args.config, overrides)
-
-    if args.smoke:
-        cfg.federated.rounds = 2
-        cfg.federated.local_epochs = 1
-        cfg.partition.num_clients = 2
-        cfg.model.num_classes = 2
-        cfg.data.num_workers = 0
-        cfg.data.batch_size = 16
-        cfg.device = "cpu"
-        # Random init keeps the smoke test hermetic: it exercises every code
-        # path without needing the ImageNet weights download.
-        cfg.model.pretrained = False
 
     name = run_name(cfg)
     run_dir = Path(cfg.runs_dir) / "federated" / ("smoke" if args.smoke else name)
