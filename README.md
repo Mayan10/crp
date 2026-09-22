@@ -176,6 +176,11 @@ The core grid is not practical on a laptop. Run it on a GPU: step 6 of
 prints the projected total for that machine, which is more reliable than
 extrapolating from the table above.
 
+## Understanding the code
+
+`CODEMAP.md` walks the codebase in reading order, saying what each file is
+responsible for and what to check when reading it.
+
 ## Repository layout
 
 ```
