@@ -69,6 +69,87 @@ def centralized_best_val(results_dir: Path) -> float | None:
     return float(np.mean(values)) if values else None
 
 
+XAI_METRICS = (
+    "deletion_auc",
+    "insertion_auc",
+    "leaf_energy_ratio",
+    "leaf_pointing_hit",
+    "lesion_energy_ratio",
+    "lesion_pointing_hit",
+    "spearman_vs_centralized",
+    "topk_iou_vs_centralized",
+)
+
+
+def summarize_xai(per_image: pd.DataFrame, n_resamples: int = 1000, seed: int = 42) -> pd.DataFrame:
+    """Mean and 95 percent bootstrap interval per model, method and metric.
+
+    The interval is over the sampled images, which is the uncertainty that
+    matters when the sample is 380 images out of the test split.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    for (method, model), group in per_image.groupby(["method", "model"], sort=True):
+        record = {"method": method, "model": model, "n_images": int(len(group))}
+        for metric in XAI_METRICS:
+            if metric not in group.columns:
+                continue
+            values = pd.to_numeric(group[metric], errors="coerce").dropna().to_numpy(dtype=float)
+            if len(values) == 0:
+                continue
+            draws = np.array([
+                rng.choice(values, size=len(values), replace=True).mean()
+                for _ in range(n_resamples)
+            ])
+            low, high = np.percentile(draws, [2.5, 97.5])
+            record[metric] = float(values.mean())
+            record[f"{metric}_ci"] = f"[{low:.3f}, {high:.3f}]"
+            record[f"{metric}_n"] = int(len(values))
+        rows.append(record)
+    return pd.DataFrame(rows)
+
+
+def xai_significance(per_image: pd.DataFrame) -> pd.DataFrame:
+    """Paired Wilcoxon tests, FedProx against FedAvg, on identical images."""
+    from fedxcrop.eval.stats import wilcoxon
+
+    rows = []
+    for method in sorted(per_image["method"].unique()):
+        subset = per_image[per_image["method"] == method]
+        models = subset["model"].unique()
+        for alpha_tag in sorted({
+            part for model in models for part in model.split("_") if part.startswith("alpha")
+        }):
+            prox = [m for m in models if m.startswith("fedprox") and alpha_tag in m]
+            avg = [m for m in models if m.startswith("fedavg") and alpha_tag in m]
+            if not prox or not avg:
+                continue
+            left = subset[subset["model"] == prox[0]]
+            right = subset[subset["model"] == avg[0]]
+            merged = left.merge(right, on="path", suffixes=("_prox", "_avg"))
+
+            for metric in XAI_METRICS:
+                columns = (f"{metric}_prox", f"{metric}_avg")
+                if not all(c in merged.columns for c in columns):
+                    continue
+                pair = merged[list(columns)].apply(pd.to_numeric, errors="coerce").dropna()
+                if len(pair) < 10:
+                    continue
+                result = wilcoxon(pair[columns[0]], pair[columns[1]])
+                rows.append({
+                    "method": method,
+                    "alpha": alpha_tag.replace("alpha", ""),
+                    "metric": metric,
+                    "fedprox_mean": float(pair[columns[0]].mean()),
+                    "fedavg_mean": float(pair[columns[1]].mean()),
+                    "median_difference": result["median_difference"],
+                    "n_pairs": result["n_pairs"],
+                    "p_value": result["p_value"],
+                    "significant_at_0.05": result["p_value"] < 0.05,
+                })
+    return pd.DataFrame(rows)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/base.yaml")
@@ -175,6 +256,22 @@ def main() -> int:
     per_image_path = results_dir / "xai" / "per_image_metrics.csv"
     if per_image_path.is_file():
         per_image = pd.read_csv(per_image_path)
+
+        # XAI metrics table: mean with a 95 percent interval over the sampled
+        # images, per model and method, plus the paired FedProx against FedAvg
+        # tests at each alpha.
+        xai_table = summarize_xai(per_image, cfg.xai.bootstrap_resamples,
+                                  cfg.eval.bootstrap_seed)
+        save_table(xai_table, tables_dir, "xai_metrics")
+        print("\nXAI metrics:")
+        print(xai_table.to_string(index=False))
+
+        xai_tests = xai_significance(per_image)
+        if not xai_tests.empty:
+            save_table(xai_tests, tables_dir, "xai_significance_tests")
+            print("\nFedProx against FedAvg on the same images (paired Wilcoxon):")
+            print(xai_tests.to_string(index=False))
+
         for metric in ("deletion_auc", "insertion_auc", "leaf_energy_ratio",
                        "spearman_vs_centralized"):
             if metric in per_image and per_image[metric].notna().any():
