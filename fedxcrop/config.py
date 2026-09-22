@@ -78,6 +78,7 @@ class FederatedConfig:
     """
 
     strategy: str = "fedavg"  # "fedavg" or "fedprox"
+    engine: str = "flower"  # "flower" (Flower simulation) or "sequential"
     rounds: int = 30
     local_epochs: int = 1
     mu: float = 0.01

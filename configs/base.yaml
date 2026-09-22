@@ -40,6 +40,7 @@ partition:
 
 federated:
   strategy: fedavg
+  engine: flower
   rounds: 30
   local_epochs: 1
   mu: 0.01

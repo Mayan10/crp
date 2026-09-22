@@ -25,6 +25,27 @@ of correct predictions on a stated number of images.
   Jensen-Shannon divergence of each client's label distribution from the global
   one, and shown as per client class histograms.
 
+## Federated engines
+
+Rounds can be driven two ways, selected by `federated.engine` or `--engine`:
+
+- `flower` (default) uses Flower's simulation engine, which runs each client in
+  its own Ray worker. This is what the reported results are produced with.
+- `sequential` runs the same rounds in one process. It exists because Ray has
+  no build for every Python version, so this is the path that works on a
+  machine where Flower's simulation engine cannot start, and it is the
+  reference the Flower engine is tested against.
+
+Both call the same local training and the same aggregation
+(`fedxcrop/fl/local.py`): the FedProx proximal term and the shard size
+weighting are defined once and unit tested once. `test_both_engines_agree` in
+`tests/test_smoke.py` checks the two against each other on the smoke
+configuration and is the first thing to run on a new machine.
+
+FedProx uses the same server side aggregation as FedAvg and differs only in the
+client's local objective, which is what the FedProx paper specifies. That is
+why `federated.strategy` changes the client, not the strategy class.
+
 ## Setup
 
 Python 3.10 or newer.
@@ -73,7 +94,8 @@ Exercises the whole path on a tiny subset, on CPU, in under five minutes:
 
 ```bash
 python scripts/train_centralized.py --config configs/centralized.yaml --smoke
-python scripts/run_federated.py --config configs/fedprox_noniid.yaml --smoke
+python scripts/run_federated.py --config configs/fedprox_noniid.yaml --smoke --engine sequential
+python scripts/run_federated.py --config configs/fedprox_noniid.yaml --smoke --engine flower
 python -m pytest tests/ -q                    # includes the slow end to end runs
 ```
 

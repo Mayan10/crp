@@ -22,6 +22,7 @@ from fedxcrop.data.partition import build_partition, load_partition
 from fedxcrop.data.splits import load_classes, load_split
 from fedxcrop.eval.evaluate import save_predictions
 from fedxcrop.eval.metrics import save_metrics
+from fedxcrop.fl.flower_simulation import run_federated_flower, simulation_available
 from fedxcrop.fl.simulation import evaluate_global, run_federated
 from fedxcrop.models.factory import build_model, load_checkpoint
 
@@ -57,6 +58,8 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--smoke", action="store_true", help="tiny CPU run of the whole path")
     parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument("--engine", choices=["flower", "sequential"], default=None,
+                        help="overrides federated.engine from the config")
     parser.add_argument("--skip-existing", action="store_true",
                         help="exit immediately if the final test metrics already exist")
     parser.add_argument("--set", nargs="*", default=[])
@@ -73,6 +76,8 @@ def main() -> int:
     overrides = (smoke_overrides if args.smoke else []) + list(args.set)
     if args.seed is not None:
         overrides.append(f"seed={args.seed}")
+    if args.engine is not None:
+        overrides.append(f"federated.engine={args.engine}")
     cfg = load_config(args.config, overrides)
 
     name = run_name(cfg)
@@ -135,7 +140,22 @@ def main() -> int:
         batch_size=cfg.data.batch_size, shuffle=False, num_workers=cfg.data.num_workers,
     )
 
-    outcome = run_federated(
+    if cfg.federated.engine == "flower":
+        available, reason = simulation_available()
+        if not available:
+            raise SystemExit(
+                f"federated.engine is 'flower' but it cannot run here.\n  {reason}"
+            )
+        run = run_federated_flower
+    elif cfg.federated.engine == "sequential":
+        run = run_federated
+    else:
+        raise SystemExit(
+            f"unknown federated.engine {cfg.federated.engine!r}, "
+            f"expected 'flower' or 'sequential'"
+        )
+
+    run(
         cfg, partition, val_loader, device, run_dir,
         class_names=classes, resume=not args.no_resume,
     )

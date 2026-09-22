@@ -157,7 +157,8 @@ def run_federated(
         )
 
     print(
-        f"clients {len(client_loaders)}  sizes {sorted(client_sizes.values())}  "
+        f"engine sequential  clients {len(client_loaders)}  "
+        f"sizes {sorted(client_sizes.values())}  "
         f"strategy {cfg.federated.strategy}"
         + (f" mu {cfg.federated.mu}" if cfg.federated.strategy == "fedprox" else "")
         + f"\nrounds {cfg.federated.rounds}  local epochs {cfg.federated.local_epochs}  "
@@ -241,6 +242,7 @@ def run_federated(
             on_round_end(round_number, record)
 
     summary = {
+        "engine": "sequential",
         "best": best,
         "rounds_completed": cfg.federated.rounds,
         "n_parameters": n_parameters,
