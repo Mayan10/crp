@@ -55,6 +55,12 @@ def build_claim_audit(table: pd.DataFrame, significance: pd.DataFrame, xai: pd.D
     """One row per claim from the original paper, decided from the new numbers."""
     rows: list[dict] = []
     has_runs = not table.empty and "label" in table.columns
+    if has_runs:
+        # The legacy reproduction deliberately keeps the original protocol's
+        # defects, so it must never be pooled into a comparison about the
+        # corrected one. It is reported on its own, further down the report.
+        table = table[table["init"] == "imagenet"]
+        has_runs = not table.empty
     centralized = lookup(table, "centralized")
     iid = lookup(table, "fedavg IID")
 
@@ -156,7 +162,8 @@ def build_claim_audit(table: pd.DataFrame, significance: pd.DataFrame, xai: pd.D
                 f"mean Spearman rank correlation with the centralized model {mean_rho:.3f}. {per_model}",
                 "results/xai/per_image_metrics.csv", outcome))
 
-        comparisons = []
+        comparisons: list[str] = []
+        outcomes: list[tuple[float, float]] = []
         for method in sorted(xai["method"].unique()):
             subset = xai[xai["method"] == method]
             for alpha_tag in ("alpha0.1", "alpha0.5"):
@@ -175,10 +182,16 @@ def build_claim_audit(table: pd.DataFrame, significance: pd.DataFrame, xai: pd.D
                     f"{method} {alpha_tag}: FedProx agreement {direction} by "
                     f"{abs(result['median_difference']):.3f} (Wilcoxon p = {result['p_value']:.3g})"
                 )
+                outcomes.append((result["median_difference"], result["p_value"]))
         if comparisons:
-            wins = sum("higher" in c and "p = 0.0" in c for c in comparisons)
-            outcome = "supported" if wins == len(comparisons) else (
-                "partially supported" if wins else "not supported")
+            wins = sum(1 for delta, p in outcomes if delta > 0 and p < SIGNIFICANCE)
+            losses = sum(1 for delta, p in outcomes if delta < 0 and p < SIGNIFICANCE)
+            if wins == len(outcomes):
+                outcome = "supported"
+            elif wins and not losses:
+                outcome = "partially supported"
+            else:
+                outcome = "not supported"
             rows.append(verdict_row(
                 "FedProx preserves explanation quality better than FedAvg",
                 "; ".join(comparisons), "results/xai/per_image_metrics.csv", outcome))

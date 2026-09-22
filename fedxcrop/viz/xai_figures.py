@@ -132,18 +132,29 @@ def metric_distribution(
 
     for ax, method in zip(axes, methods):
         subset = per_image[per_image["method"] == method]
-        data = [subset[subset["model"] == m][metric].dropna().to_numpy() for m in models]
-        data = [d for d in data if len(d)]
-        if not data:
+        # Keep labels and boxes together. Some metrics are undefined for some
+        # models (agreement with the centralized model does not exist for the
+        # centralized model itself), and those models must drop out of the
+        # labels as well as the data, not just the data.
+        present = [
+            (model, values)
+            for model in models
+            for values in [subset[subset["model"] == model][metric].dropna().to_numpy()]
+            if len(values)
+        ]
+        if not present:
+            ax.set_axis_off()
             continue
-        parts = ax.boxplot(data, patch_artist=True, widths=0.6, showfliers=False)
+
+        labels, data = zip(*present)
+        parts = ax.boxplot(list(data), patch_artist=True, widths=0.6, showfliers=False)
         for patch, color in zip(parts["boxes"], PALETTE):
             patch.set_facecolor(color)
             patch.set_alpha(0.65)
         for median in parts["medians"]:
             median.set_color("black")
         ax.set_xticks(range(1, len(data) + 1))
-        ax.set_xticklabels([m.replace("_", "\n") for m in models], fontsize=6)
+        ax.set_xticklabels([m.replace("_", "\n") for m in labels], fontsize=6)
         ax.set_title(method)
 
     axes[0].set_ylabel(metric.replace("_", " "))

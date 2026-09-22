@@ -185,3 +185,69 @@ def test_lookup_and_significance_helpers_return_none_when_absent():
     assert lookup(table, "centralized") is not None
     assert lookup(table, "missing") is None
     assert significance_for(pd.DataFrame(), "a", "b") is None
+
+
+def test_legacy_runs_are_excluded_from_corrected_protocol_comparisons():
+    """The legacy reproduction keeps the original defects and must not be pooled in.
+
+    It shares a label shape with a corrected run (both are fedavg at some
+    alpha), so without filtering it lands inside the alpha sweep and corrupts
+    the trend it is being compared against.
+    """
+    table = results_table([
+        {"label": "fedavg IID", "strategy": "fedavg", "scheme": "iid",
+         "accuracy_mean": 0.989, "macro_precision_mean": 0.985},
+        {"label": "fedavg alpha=0.1", "strategy": "fedavg", "alpha": 0.1,
+         "accuracy_mean": 0.969, "macro_precision_mean": 0.955},
+        {"label": "fedavg alpha=0.5", "strategy": "fedavg", "alpha": 0.5,
+         "accuracy_mean": 0.983, "macro_precision_mean": 0.974},
+        {"label": "fedavg alpha=1", "strategy": "fedavg", "alpha": 1.0,
+         "accuracy_mean": 0.987, "macro_precision_mean": 0.982},
+        # Legacy: same strategy and alpha as a corrected run, much higher accuracy
+        # because it started from the centralized model.
+        {"label": "fedavg alpha=0.5 (legacy init)", "strategy": "fedavg", "alpha": 0.5,
+         "init": "checkpoint", "accuracy_mean": 0.992, "macro_precision_mean": 0.988},
+    ])
+    audit = build_claim_audit(table, pd.DataFrame(), pd.DataFrame())
+    row = find(audit, "Non-IID data reduces")
+    # With the legacy row excluded, accuracy rises monotonically with alpha.
+    assert "monotonically with alpha: True" in row["new evidence"]
+
+
+def xai_pair_frame(prox_rho: float, avg_rho: float, n: int = 60) -> pd.DataFrame:
+    """Paired per image agreement scores for FedProx and FedAvg at alpha 0.1."""
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for i in range(n):
+        noise = rng.normal(0, 0.01)
+        for model, rho in (("fedprox_alpha0.1", prox_rho), ("fedavg_alpha0.1", avg_rho)):
+            rows.append({
+                "path": f"img_{i}.JPG", "model": model, "method": "gradcam",
+                "leaf_energy_ratio": 0.85, "leaf_area_fraction": 0.60,
+                "spearman_vs_centralized": rho + noise,
+                "deletion_auc": 0.1, "insertion_auc": 0.8,
+            })
+    return pd.DataFrame(rows)
+
+
+def test_fedprox_explanation_verdict_reads_a_tiny_p_value_correctly():
+    """A highly significant win must not be missed.
+
+    The p value formats as scientific notation here, which an earlier
+    string based rule failed to recognise as significant.
+    """
+    audit = build_claim_audit(results_table([]), pd.DataFrame(),
+                              xai_pair_frame(prox_rho=0.80, avg_rho=0.70))
+    row = find(audit, "FedProx preserves explanation")
+    assert row["verdict"] == "supported"
+    assert "higher" in row["new evidence"]
+
+
+def test_fedprox_explanation_verdict_is_not_supported_when_fedprox_is_worse():
+    audit = build_claim_audit(results_table([]), pd.DataFrame(),
+                              xai_pair_frame(prox_rho=0.65, avg_rho=0.78))
+    row = find(audit, "FedProx preserves explanation")
+    assert row["verdict"] == "not supported"
+    assert "lower" in row["new evidence"]

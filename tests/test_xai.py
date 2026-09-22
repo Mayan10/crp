@@ -228,3 +228,41 @@ def test_randomizing_a_module_changes_its_weights():
     before = layer.weight.detach().clone()
     randomize_module(layer)
     assert not torch.allclose(before, layer.weight)
+
+
+def test_metric_distribution_drops_models_with_no_data_for_the_metric(tmp_path):
+    """Labels and boxes must stay aligned when a metric is undefined somewhere.
+
+    Agreement with the centralized model does not exist for the centralized
+    model itself, so that model has to drop out of the axis labels as well as
+    out of the data.
+    """
+    import pandas as pd
+
+    from fedxcrop.viz.xai_figures import metric_distribution
+
+    rows = []
+    for model, rho in (("centralized", None), ("fedavg", 0.7), ("fedprox", 0.8)):
+        for i in range(20):
+            rows.append({
+                "path": f"img_{i}.JPG", "model": model, "method": "gradcam",
+                "spearman_vs_centralized": rho,
+            })
+    frame = pd.DataFrame(rows)
+
+    paths = metric_distribution(frame, "spearman_vs_centralized", tmp_path, "demo")
+    assert all(p.is_file() for p in paths)
+
+
+def test_metric_distribution_survives_a_metric_with_no_data_at_all(tmp_path):
+    import numpy as np
+    import pandas as pd
+
+    from fedxcrop.viz.xai_figures import metric_distribution
+
+    frame = pd.DataFrame({
+        "path": ["a.JPG"], "model": ["centralized"], "method": ["gradcam"],
+        "spearman_vs_centralized": [np.nan],
+    })
+    paths = metric_distribution(frame, "spearman_vs_centralized", tmp_path, "empty")
+    assert all(p.is_file() for p in paths)
