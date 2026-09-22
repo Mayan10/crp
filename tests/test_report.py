@@ -251,3 +251,18 @@ def test_fedprox_explanation_verdict_is_not_supported_when_fedprox_is_worse():
     row = find(audit, "FedProx preserves explanation")
     assert row["verdict"] == "not supported"
     assert "lower" in row["new evidence"]
+
+
+def test_figure_row_labels_never_collide():
+    """Two rows with the same label would leave the reader unable to tell them apart."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from make_xai_figures import short_label, short_labels
+
+    real = ["centralized_seed0", "fedavg_dirichlet_alpha0.1_K5_seed0",
+            "fedprox_dirichlet_alpha0.1_K5_mu0.01_seed0"]
+    assert short_labels(real) == ["centralized", "fedavg alpha0.1", "fedprox alpha0.1 mu0.01"]
+
+    # When shortening would collide, the full names are kept instead.
+    colliding = ["probe_a", "probe_b"]
+    assert short_label("probe_a") == short_label("probe_b")
+    assert short_labels(colliding) == colliding

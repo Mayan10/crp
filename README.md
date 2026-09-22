@@ -140,6 +140,8 @@ The first model listed is the reference the others are compared against.
 
 ```bash
 python scripts/make_figures.py                    # results/tables/, results/figures/, NOTES.md
+python scripts/make_xai_figures.py --models centralized_seed0 \
+    fedprox_dirichlet_alpha0.1_K5_mu<selected>_seed0    # figures 4, 5 and 7
 python scripts/make_report.py                     # RESULTS.md
 ```
 

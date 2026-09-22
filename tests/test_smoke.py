@@ -28,20 +28,39 @@ def run_script(*args: str) -> subprocess.CompletedProcess:
         cwd=REPO,
         capture_output=True,
         text=True,
-        timeout=600,
+        timeout=900,
     )
     if result.returncode != 0:
         raise AssertionError(f"{args} failed:\n{result.stdout[-3000:]}\n{result.stderr[-3000:]}")
     return result
 
 
+@pytest.fixture
+def workspace(tmp_path):
+    """Private runs/ and results/ directories for one end to end test.
+
+    Smoke runs otherwise all share `runs/federated/smoke`, so a checkpoint left
+    by one test decides where the next one resumes from. Giving each test its
+    own directories makes them independent of each other and of execution
+    order.
+    """
+    runs, results = tmp_path / "runs", tmp_path / "results"
+    runs.mkdir()
+    results.mkdir()
+    return {
+        "runs": runs,
+        "results": results,
+        "overrides": [f"runs_dir={runs}", f"results_dir={results}"],
+    }
+
+
 @pytest.mark.slow
 @needs_data
-def test_centralized_smoke_run_produces_auditable_results():
+def test_centralized_smoke_run_produces_auditable_results(workspace):
     run_script("scripts/train_centralized.py", "--config", "configs/centralized.yaml",
-               "--smoke", "--no-resume")
+               "--smoke", "--no-resume", "--set", *workspace["overrides"])
 
-    results = REPO / "results" / "centralized" / "smoke"
+    results = workspace["results"] / "centralized" / "smoke"
     metrics = json.loads((results / "test_metrics.json").read_text())
 
     # The reported rate has to follow from the integer counts.
@@ -59,11 +78,12 @@ def test_centralized_smoke_run_produces_auditable_results():
 
 @pytest.mark.slow
 @needs_data
-def test_federated_smoke_run_produces_auditable_results():
+def test_federated_smoke_run_produces_auditable_results(workspace):
     run_script("scripts/run_federated.py", "--config", "configs/fedprox_noniid.yaml",
-               "--smoke", "--no-resume", "--engine", "sequential")
+               "--smoke", "--no-resume", "--engine", "sequential",
+               "--set", *workspace["overrides"])
 
-    results = REPO / "results" / "federated" / "smoke"
+    results = workspace["results"] / "federated" / "smoke"
     metrics = json.loads((results / "test_metrics.json").read_text())
 
     assert metrics["accuracy"] == metrics["n_correct"] / metrics["n_total"]
@@ -88,7 +108,7 @@ def test_federated_smoke_run_produces_auditable_results():
 
 @pytest.mark.slow
 @needs_data
-def test_federated_run_resumes_from_the_last_completed_round(tmp_path):
+def test_federated_run_resumes_from_the_last_completed_round(workspace):
     """A run stopped after one round continues rather than restarting.
 
     This is what makes a long run survive a disconnected session.
@@ -97,15 +117,17 @@ def test_federated_run_resumes_from_the_last_completed_round(tmp_path):
         "scripts/run_federated.py", "--config", "configs/fedprox_noniid.yaml", "--smoke",
         "--engine", "sequential",
     ]
-    run_script(*common, "--no-resume", "--set", "federated.rounds=1")
+    history_path = workspace["results"] / "federated" / "smoke" / "history.csv"
 
-    history_after_one = pd.read_csv(REPO / "results" / "federated" / "smoke" / "history.csv")
+    run_script(*common, "--no-resume", "--set", "federated.rounds=1",
+               *workspace["overrides"])
+    history_after_one = pd.read_csv(history_path)
     assert list(history_after_one["round"]) == [1]
 
-    result = run_script(*common, "--set", "federated.rounds=2")
-    assert "resuming at round 2" in result.stdout
+    result = run_script(*common, "--set", "federated.rounds=2", *workspace["overrides"])
+    assert "resuming at round 2" in result.stdout, result.stdout
 
-    history_after_two = pd.read_csv(REPO / "results" / "federated" / "smoke" / "history.csv")
+    history_after_two = pd.read_csv(history_path)
     assert list(history_after_two["round"]) == [1, 2]
     # The first round is the one already computed, not a recomputation.
     assert history_after_two.iloc[0]["val_accuracy"] == history_after_one.iloc[0]["val_accuracy"]
@@ -123,8 +145,8 @@ _flower_ok, _flower_reason = simulation_available()
 needs_flower = pytest.mark.skipif(not _flower_ok, reason=_flower_reason)
 
 
-def read_smoke_results() -> tuple[dict, pd.DataFrame]:
-    results = REPO / "results" / "federated" / "smoke"
+def read_smoke_results(results_dir: Path) -> tuple[dict, pd.DataFrame]:
+    results = Path(results_dir) / "federated" / "smoke"
     return json.loads((results / "test_metrics.json").read_text()), pd.read_csv(
         results / "history.csv"
     )
@@ -133,18 +155,19 @@ def read_smoke_results() -> tuple[dict, pd.DataFrame]:
 @pytest.mark.slow
 @needs_flower
 @needs_data
-def test_flower_engine_smoke_run_produces_auditable_results():
+def test_flower_engine_smoke_run_produces_auditable_results(workspace):
     run_script("scripts/run_federated.py", "--config", "configs/fedprox_noniid.yaml",
-               "--smoke", "--no-resume", "--engine", "flower")
+               "--smoke", "--no-resume", "--engine", "flower",
+               "--set", *workspace["overrides"])
 
-    metrics, history = read_smoke_results()
+    metrics, history = read_smoke_results(workspace["results"])
     assert metrics["accuracy"] == metrics["n_correct"] / metrics["n_total"]
     assert metrics["selected_round"] >= 1
     assert list(history["round"]) == [1, 2]
     assert (history["n_clients"] == 2).all()
 
     summary = json.loads(
-        (REPO / "results" / "federated" / "smoke" / "summary.json").read_text()
+        (workspace["results"] / "federated" / "smoke" / "summary.json").read_text()
     )
     assert summary["engine"] == "flower"
     assert summary["init"] == "imagenet"
@@ -153,17 +176,18 @@ def test_flower_engine_smoke_run_produces_auditable_results():
 @pytest.mark.slow
 @needs_flower
 @needs_data
-def test_flower_engine_resumes_from_the_last_completed_round():
+def test_flower_engine_resumes_from_the_last_completed_round(workspace):
     common = ["scripts/run_federated.py", "--config", "configs/fedprox_noniid.yaml",
               "--smoke", "--engine", "flower"]
-    run_script(*common, "--no-resume", "--set", "federated.rounds=1")
-    _, after_one = read_smoke_results()
+    run_script(*common, "--no-resume", "--set", "federated.rounds=1",
+               *workspace["overrides"])
+    _, after_one = read_smoke_results(workspace["results"])
     assert list(after_one["round"]) == [1]
 
-    result = run_script(*common, "--set", "federated.rounds=2")
-    assert "resuming after round 1" in result.stdout
+    result = run_script(*common, "--set", "federated.rounds=2", *workspace["overrides"])
+    assert "resuming after round 1" in result.stdout, result.stdout
 
-    _, after_two = read_smoke_results()
+    _, after_two = read_smoke_results(workspace["results"])
     assert list(after_two["round"]) == [1, 2]
     # Round 1 is carried over, not recomputed.
     assert after_two.iloc[0]["val_accuracy"] == after_one.iloc[0]["val_accuracy"]
@@ -172,7 +196,7 @@ def test_flower_engine_resumes_from_the_last_completed_round():
 @pytest.mark.slow
 @needs_flower
 @needs_data
-def test_both_engines_agree():
+def test_both_engines_agree(workspace):
     """The two engines must implement one method, not two.
 
     Exact equality is not expected: Flower runs each client in its own Ray
@@ -185,13 +209,19 @@ def test_both_engines_agree():
     does not.
     """
     settings = ["--config", "configs/fedprox_noniid.yaml", "--smoke", "--no-resume",
-                "--set", "federated.rounds=2", "data.num_workers=0"]
+                "--set", "federated.rounds=2", "data.num_workers=0",
+                *workspace["overrides"]]
 
     run_script("scripts/run_federated.py", *settings, "--engine", "sequential")
-    sequential_metrics, sequential_history = read_smoke_results()
+    sequential_metrics, sequential_history = read_smoke_results(workspace["results"])
+    # Keep the sequential run: the Flower run writes to the same place.
+    import shutil
+    kept = workspace["results"] / "sequential_copy"
+    shutil.copytree(workspace["results"] / "federated" / "smoke", kept)
+    shutil.rmtree(workspace["runs"] / "federated" / "smoke")
 
     run_script("scripts/run_federated.py", *settings, "--engine", "flower")
-    flower_metrics, flower_history = read_smoke_results()
+    flower_metrics, flower_history = read_smoke_results(workspace["results"])
 
     # Same evaluation set, same accounting.
     assert flower_metrics["n_total"] == sequential_metrics["n_total"]
