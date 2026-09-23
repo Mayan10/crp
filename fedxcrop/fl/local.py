@@ -72,6 +72,7 @@ def train_local(
     weight_decay: float = 0.0,
     strategy: str = "fedavg",
     mu: float = 0.0,
+    augment=None,
 ) -> dict:
     """Train one client for `epochs` local epochs on its own shard.
 
@@ -96,6 +97,8 @@ def train_local(
         for images, labels in loader:
             images = images.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
+            if augment is not None:
+                images = augment(images)
 
             optimizer.zero_grad(set_to_none=True)
             logits = model(images)

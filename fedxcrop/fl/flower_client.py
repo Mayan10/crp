@@ -17,6 +17,7 @@ from flwr.common import Context
 from flwr.common.constant import PARTITION_ID_KEY
 
 from fedxcrop.data.dataset import build_dataset, build_loader
+from fedxcrop.data.gpu_augment import make_train_augment
 from fedxcrop.fl.local import train_local
 from fedxcrop.models.factory import build_model, get_weights, set_weights
 
@@ -33,8 +34,10 @@ class FedXCropClient(fl.client.NumPyClient):
         # start from at the beginning of every round, so downloading ImageNet
         # weights inside each client would be wasted work.
         self.model = build_model(cfg.model.name, cfg.model.num_classes, pretrained=False)
+        self.augment = make_train_augment(cfg, device, seed_offset=client_id)
         self.loader = build_loader(
-            build_dataset(cfg.data.root, frame, train=True, image_size=cfg.data.image_size),
+            build_dataset(cfg.data.root, frame, train=True, image_size=cfg.data.image_size,
+                          gpu_augment=cfg.data.gpu_augment),
             batch_size=cfg.data.batch_size,
             shuffle=True,
             num_workers=cfg.data.num_workers,
@@ -62,6 +65,7 @@ class FedXCropClient(fl.client.NumPyClient):
             weight_decay=self.cfg.federated.weight_decay,
             strategy=self.cfg.federated.strategy,
             mu=self.cfg.federated.mu,
+            augment=self.augment,
         )
         metrics = {
             "client_id": self.client_id,

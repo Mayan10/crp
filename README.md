@@ -25,6 +25,28 @@ of correct predictions on a stated number of images.
   Jensen-Shannon divergence of each client's label distribution from the global
   one, and shown as per client class histograms.
 
+## Where the augmentation runs
+
+The input pipeline, not the GPU, is the bottleneck on a runtime with few CPU
+cores. Profiling it: decoding runs at about 3,750 images per second, while
+`ColorJitter(0.4, 0.4, 0.3, 0.1)` alone manages 577, roughly three quarters of
+the total cost. On a two core machine that starves the accelerator.
+
+With `data.gpu_augment: true` (the default) the loader does only decode and the
+geometric transforms and hands over uint8, and the colour jitter and
+normalization are applied to whole batches on the accelerator. Setting it to
+false puts everything back in the loader workers.
+
+The two paths are the same augmentation. `fedxcrop/data/gpu_augment.py` draws
+its factors per image, as torchvision does, and each operation is checked
+against `torchvision.transforms.functional` in `tests/test_gpu_augment.py`.
+The one deliberate difference is that the random order of the four operations
+is drawn per batch rather than per image, which avoids a fixed ordering bias
+the same way while staying vectorised.
+
+`data.num_workers` is clamped to the number of CPUs the process can use, so
+asking for more workers than cores cannot silently cost throughput.
+
 ## Federated engines
 
 Rounds can be driven two ways, selected by `federated.engine` or `--engine`:

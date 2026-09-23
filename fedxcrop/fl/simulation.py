@@ -24,6 +24,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from fedxcrop.data.dataset import build_dataset, build_loader
+from fedxcrop.data.gpu_augment import make_train_augment
 from fedxcrop.eval.evaluate import predict
 from fedxcrop.eval.metrics import compute_metrics
 from fedxcrop.fl.local import communication_bytes, train_local, weighted_average
@@ -60,6 +61,7 @@ def build_client_loaders(
             frame.reset_index(drop=True),
             train=True,
             image_size=cfg.data.image_size,
+            gpu_augment=cfg.data.gpu_augment,
         )
         loaders[int(client_id)] = build_loader(
             dataset,
@@ -136,6 +138,10 @@ def run_federated(
     global_weights = get_weights(model)
 
     client_loaders = build_client_loaders(cfg, partition, seed=cfg.seed)
+    augmenters = {
+        client_id: make_train_augment(cfg, device, seed_offset=client_id)
+        for client_id in client_loaders
+    }
     client_sizes = {cid: len(loader.dataset) for cid, loader in client_loaders.items()}
     n_parameters = count_parameters(model)
     bytes_per_round = communication_bytes(n_parameters, len(client_loaders))
@@ -183,6 +189,7 @@ def run_federated(
                 weight_decay=cfg.federated.weight_decay,
                 strategy=cfg.federated.strategy,
                 mu=cfg.federated.mu,
+                augment=augmenters[client_id],
             )
             client_weights.append(get_weights(model))
             sizes.append(stats["n_images"])

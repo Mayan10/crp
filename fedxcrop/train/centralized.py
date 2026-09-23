@@ -20,6 +20,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
+from fedxcrop.data.gpu_augment import make_train_augment
 from fedxcrop.eval.evaluate import predict, save_predictions
 from fedxcrop.eval.metrics import compute_metrics, save_metrics
 from fedxcrop.models.factory import build_model, load_checkpoint, save_checkpoint
@@ -50,8 +51,14 @@ def train_one_epoch(
     optimizer,
     device: torch.device,
     log_every: int = 0,
+    augment=None,
 ) -> dict:
-    """One pass over the training data, returning loss and accuracy on it."""
+    """One pass over the training data, returning loss and accuracy on it.
+
+    `augment` applies the colour jitter and normalization on the accelerator
+    when the loader hands over uint8 batches. When it is None the loader has
+    already done that work on the CPU.
+    """
     model.train()
     model.to(device)
     criterion = nn.CrossEntropyLoss()
@@ -60,6 +67,8 @@ def train_one_epoch(
     for step, (images, labels) in enumerate(loader):
         images = images.to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
+        if augment is not None:
+            images = augment(images)
 
         optimizer.zero_grad(set_to_none=True)
         logits = model(images)
@@ -128,6 +137,7 @@ def train_centralized(
     set_seed(cfg.seed)
     model = build_model(cfg.model.name, cfg.model.num_classes, cfg.model.pretrained)
     model.to(device)
+    augment = make_train_augment(cfg, device)
 
     optimizer = build_optimizer(model, cfg.centralized.optimizer, cfg.centralized.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(
@@ -150,7 +160,9 @@ def train_centralized(
 
     for epoch in range(start_epoch, cfg.centralized.epochs):
         started = time.time()
-        train_stats = train_one_epoch(model, train_loader, optimizer, device, log_every)
+        train_stats = train_one_epoch(
+            model, train_loader, optimizer, device, log_every, augment=augment
+        )
         val_metrics, _, _ = evaluate_split(
             model, val_loader, device, cfg.model.num_classes, class_names
         )

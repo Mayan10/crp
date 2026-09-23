@@ -12,7 +12,11 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
 from fedxcrop.data.splits import load_split
-from fedxcrop.data.transforms import eval_transform, train_transform
+from fedxcrop.data.transforms import (
+    eval_transform,
+    train_transform,
+    train_transform_geometric,
+)
 
 
 class PlantVillageDataset(Dataset):
@@ -62,8 +66,19 @@ def build_dataset(
     train: bool,
     image_size: int = 224,
     return_index: bool = False,
+    gpu_augment: bool = False,
 ) -> PlantVillageDataset:
-    transform = train_transform(image_size) if train else eval_transform(image_size)
+    """Dataset for one split.
+
+    With `gpu_augment`, a training dataset yields uint8 images carrying only
+    the geometric augmentation; the colour jitter and the normalization are
+    then applied to whole batches on the accelerator. Evaluation datasets are
+    unaffected, since they are never augmented.
+    """
+    if train:
+        transform = train_transform_geometric(image_size) if gpu_augment else train_transform(image_size)
+    else:
+        transform = eval_transform(image_size)
     return PlantVillageDataset(root, frame, transform=transform, return_index=return_index)
 
 

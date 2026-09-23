@@ -39,9 +39,19 @@ train and test. Reports, never modifies: 157 of 5,428 test images have a match
 within Hamming distance 4.
 
 **`fedxcrop/data/transforms.py`, `dataset.py`** Augmentation on train only;
-validation and test are deterministic. Note the comment on
-`persistent_workers` in `build_loader`, which is a memory trap with one loader
-per client.
+validation and test are deterministic. Two comments worth reading in
+`build_loader`: `persistent_workers`, which is a memory trap with one loader
+per client, and `effective_workers`, which stops the loader being asked for
+more worker processes than there are cores.
+
+**`fedxcrop/data/gpu_augment.py`** The colour jitter, vectorised onto the
+accelerator because it was three quarters of the cost of the input pipeline
+and was starving the GPU. Factors are drawn per image, and every operation is
+checked against torchvision numerically. Two performance notes in here are
+worth the read: `hsv_to_rgb` is branchless because the obvious one hot form
+allocates six times the batch, and `rgb_to_hsv` uses `amax`/`amin` rather than
+`max`/`min` because the latter also compute argmax indices, which cost two
+orders of magnitude more.
 
 ## 3. Model and measurement
 

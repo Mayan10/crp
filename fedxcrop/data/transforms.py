@@ -28,6 +28,28 @@ def train_transform(image_size: int = 224):
     )
 
 
+def train_transform_geometric(image_size: int = 224):
+    """Training pipeline without the colour jitter, returning uint8.
+
+    Pairs with `fedxcrop.data.gpu_augment.GpuAugment`, which applies the colour
+    jitter and the normalization on the accelerator. The colour jitter is about
+    three quarters of the cost of the CPU pipeline, so moving it off the CPU is
+    what keeps the loader ahead of the GPU on a runtime with few cores.
+
+    Returning uint8 rather than float also cuts the bytes handed to the GPU by
+    four.
+    """
+    return transforms.Compose(
+        [
+            transforms.RandomResizedCrop(image_size, scale=(0.6, 1.0)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.RandomRotation(45),
+            transforms.PILToTensor(),
+        ]
+    )
+
+
 def eval_transform(image_size: int = 224):
     """Deterministic pipeline for validation, test, and explainability."""
     resize_size = int(round(image_size * 256 / 224))

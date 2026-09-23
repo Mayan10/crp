@@ -18,6 +18,9 @@ data:
   test_fraction: 0.1
   batch_size: 32
   num_workers: 4
+  # Apply the colour jitter and normalization on the accelerator instead of in
+  # the loader workers. Same augmentation, far less CPU work per image.
+  gpu_augment: true
 
 model:
   name: mobilenet_v2

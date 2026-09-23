@@ -37,6 +37,7 @@ class DataConfig:
     test_fraction: float = 0.1
     batch_size: int = 32
     num_workers: int = 4
+    gpu_augment: bool = True
 
 
 @dataclass

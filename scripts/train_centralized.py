@@ -85,7 +85,8 @@ def main() -> int:
 
     loaders = {
         "train": build_loader(
-            build_dataset(cfg.data.root, frames["train"], train=True, image_size=cfg.data.image_size),
+            build_dataset(cfg.data.root, frames["train"], train=True,
+                          image_size=cfg.data.image_size, gpu_augment=cfg.data.gpu_augment),
             batch_size=cfg.data.batch_size, shuffle=True,
             num_workers=cfg.data.num_workers, seed=cfg.seed,
         ),
