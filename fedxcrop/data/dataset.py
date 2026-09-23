@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -66,6 +67,21 @@ def build_dataset(
     return PlantVillageDataset(root, frame, transform=transform, return_index=return_index)
 
 
+def available_cpus() -> int:
+    """CPUs this process may actually use, not the machine's total."""
+    try:
+        return max(1, len(os.sched_getaffinity(0)))
+    except AttributeError:  # not available on macOS
+        return max(1, os.cpu_count() or 1)
+
+
+def effective_workers(requested: int) -> int:
+    """Loader workers to actually use, never more than there are CPUs."""
+    if requested <= 0:
+        return 0
+    return max(1, min(requested, available_cpus()))
+
+
 def build_loader(
     dataset: Dataset,
     batch_size: int = 32,
@@ -82,7 +98,13 @@ def build_loader(
     processes alive at once (20 for five clients with four workers each),
     which exhausts memory on a modest machine long before it speeds anything
     up. Only long lived loaders, such as validation, ask for persistence.
+
+    `num_workers` is clamped to the number of CPUs actually available. More
+    loader processes than cores does not increase throughput on a pipeline
+    this CPU bound, it just adds context switching, and a two core runtime
+    asked for four workers is a realistic way to lose a third of the speed.
     """
+    num_workers = effective_workers(num_workers)
     generator = None
     if shuffle and seed is not None:
         generator = torch.Generator()

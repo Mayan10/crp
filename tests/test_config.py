@@ -105,3 +105,26 @@ def test_library_versions_reports_core_packages():
     versions = library_versions()
     for name in ("python", "torch", "numpy"):
         assert name in versions
+
+
+def test_loader_workers_never_exceed_available_cpus(monkeypatch):
+    """More loader processes than cores costs throughput on a CPU bound pipeline.
+
+    A two core runtime asked for four workers is a realistic way to lose a
+    large fraction of the speed, so the request is clamped rather than obeyed.
+    """
+    from fedxcrop.data import dataset as dataset_module
+
+    monkeypatch.setattr(dataset_module, "available_cpus", lambda: 2)
+    assert dataset_module.effective_workers(4) == 2
+    assert dataset_module.effective_workers(8) == 2
+    assert dataset_module.effective_workers(2) == 2
+    assert dataset_module.effective_workers(1) == 1
+    # Zero means "load in the main process" and must stay zero.
+    assert dataset_module.effective_workers(0) == 0
+
+
+def test_available_cpus_is_positive():
+    from fedxcrop.data.dataset import available_cpus
+
+    assert available_cpus() >= 1
