@@ -174,3 +174,67 @@ def test_save_table_writes_csv_and_markdown(tmp_path):
 def test_empty_results_give_an_empty_table(tmp_path):
     assert discover_runs(tmp_path).empty
     assert main_results_table(pd.DataFrame()).empty
+
+
+def test_mirror_results_copies_metrics_but_not_checkpoints(tmp_path):
+    """Results must reach durable storage after every run, without the weights.
+
+    A session cut off part way through a group would otherwise lose the
+    metrics of every run that had already finished, since only the run
+    directory is on durable storage.
+    """
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "scripts"))
+    from run_grid import mirror_results
+
+    results = tmp_path / "results"
+    (results / "centralized" / "seed0").mkdir(parents=True)
+    (results / "centralized" / "seed0" / "test_metrics.json").write_text('{"n_correct": 1}')
+    (results / "centralized" / "seed0" / "history.csv").write_text("epoch\n0\n")
+    (results / "centralized" / "seed0" / "best.pt").write_bytes(b"x" * 1000)
+
+    mirror = tmp_path / "drive"
+    copied = mirror_results(results, mirror)
+
+    assert copied == 2
+    assert (mirror / "centralized" / "seed0" / "test_metrics.json").is_file()
+    assert (mirror / "centralized" / "seed0" / "history.csv").is_file()
+    # Checkpoints are large and already live in the run directory.
+    assert not (mirror / "centralized" / "seed0" / "best.pt").exists()
+
+
+def test_mirror_results_is_incremental(tmp_path):
+    """Re-mirroring copies only what changed, so it stays cheap to call often."""
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "scripts"))
+    from run_grid import mirror_results
+
+    results = tmp_path / "results"
+    results.mkdir()
+    (results / "a.json").write_text("1")
+    mirror = tmp_path / "drive"
+
+    assert mirror_results(results, mirror) == 1
+    assert mirror_results(results, mirror) == 0  # nothing changed
+
+    import os
+    import time
+
+    time.sleep(0.01)
+    (results / "b.json").write_text("2")
+    os.utime(results / "b.json", None)
+    assert mirror_results(results, mirror) == 1
+
+
+def test_mirror_results_tolerates_a_missing_source(tmp_path):
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "scripts"))
+    from run_grid import mirror_results
+
+    assert mirror_results(tmp_path / "does_not_exist", tmp_path / "drive") == 0

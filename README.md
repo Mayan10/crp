@@ -140,7 +140,11 @@ python scripts/run_grid.py --group legacy         # reproduces the original prot
 
 The runner skips runs whose final results already exist and resumes an
 interrupted run from its last completed round, so it can be stopped and
-restarted at any point.
+restarted at any point. Pass `--mirror-results DIR` to copy results to durable
+storage after every run rather than at the end of a group: a group can take
+many hours, and without it a session cut off part way through loses the
+results of the runs that had already finished (their checkpoints survive, so
+they are re-evaluated rather than retrained, but that is still wasted time).
 
 `scripts/run_grid.py --group core --dry-run` prints the full list without
 running anything.

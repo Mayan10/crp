@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 import time
@@ -126,6 +127,33 @@ def build_jobs_for(groups: list[str], args) -> list[Job]:
     return jobs
 
 
+def mirror_results(results_dir: str | Path, mirror: str | Path) -> int:
+    """Copy result files to a second location, skipping checkpoints.
+
+    Called after every single run rather than after a whole group. A group can
+    be many hours, and a session that dies part way through it would otherwise
+    lose the results of every run that had already finished, since only the
+    run directory is on durable storage. The runs themselves would still
+    resume from their checkpoints, but their metrics would have to be
+    recomputed.
+    """
+    results_dir, mirror = Path(results_dir), Path(mirror)
+    if not results_dir.is_dir():
+        return 0
+
+    copied = 0
+    for source in results_dir.rglob("*"):
+        if not source.is_file() or source.suffix in {".pt", ".pth", ".ckpt"}:
+            continue
+        target = mirror / source.relative_to(results_dir)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists() and target.stat().st_mtime >= source.stat().st_mtime:
+            continue
+        shutil.copy2(source, target)
+        copied += 1
+    return copied
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--group", default="core",
@@ -135,6 +163,11 @@ def main() -> int:
     parser.add_argument("--mus", type=float, nargs="+", default=[0.001, 0.01, 0.1])
     parser.add_argument("--mu", type=float, default=0.01,
                         help="mu for the fedprox_noniid group, set from the selection result")
+    parser.add_argument("--results-dir", default="results",
+                        help="where runs write results, matched to the configs in use")
+    parser.add_argument("--mirror-results", default=None,
+                        help="copy results here after every run, so a session that is cut "
+                             "off part way through a group keeps what already finished")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--stop-on-failure", action="store_true")
     parser.add_argument("--set", nargs="*", default=[], help="extra overrides for every job")
@@ -160,6 +193,10 @@ def main() -> int:
                 return result.returncode
         else:
             print(f"    done in {elapsed / 60:.1f} min")
+
+        if args.mirror_results:
+            copied = mirror_results(args.results_dir, args.mirror_results)
+            print(f"    mirrored {copied} result files to {args.mirror_results}")
 
     return 0
 

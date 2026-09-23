@@ -7,8 +7,10 @@ a tiny subset so it finishes on a CPU. They are marked slow: deselect with
 """
 
 import json
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -104,6 +106,61 @@ def test_federated_smoke_run_produces_auditable_results(workspace):
     assert summary["init"] == "imagenet"
     assert summary["strategy"] == "fedprox"
     assert summary["engine"] == "sequential"
+
+
+@pytest.mark.slow
+@needs_data
+def test_centralized_run_resumes_from_the_last_completed_epoch(workspace):
+    """A centralized run stopped part way continues rather than restarting.
+
+    This is the path a session cut off by a GPU quota limit takes: the
+    checkpoint is on durable storage, so the next session picks up the epoch
+    after the last completed one.
+    """
+    common = ["scripts/train_centralized.py", "--config", "configs/centralized.yaml", "--smoke"]
+    history_path = workspace["results"] / "centralized" / "smoke" / "history.csv"
+
+    run_script(*common, "--no-resume", "--set", "centralized.epochs=1", *workspace["overrides"])
+    after_one = pd.read_csv(history_path)
+    assert list(after_one["epoch"]) == [0]
+
+    result = run_script(*common, "--set", "centralized.epochs=2", *workspace["overrides"])
+    assert "resuming from epoch 1" in result.stdout, result.stdout
+
+    after_two = pd.read_csv(history_path)
+    assert list(after_two["epoch"]) == [0, 1]
+    # The first epoch is carried over, not recomputed.
+    assert after_two.iloc[0]["val_accuracy"] == after_one.iloc[0]["val_accuracy"]
+
+
+@pytest.mark.slow
+@needs_data
+def test_a_finished_run_is_not_retrained(workspace):
+    """Re-running a completed configuration must not train it again.
+
+    After a session dies mid group the results of the runs that had already
+    finished may be missing, so the runner starts them again. Their
+    checkpoints say the work is done, so they must fall straight through to
+    the evaluation rather than repeating the training.
+    """
+    common = ["scripts/run_federated.py", "--config", "configs/fedprox_noniid.yaml",
+              "--smoke", "--engine", "sequential"]
+    run_script(*common, "--no-resume", "--set", "federated.rounds=2", *workspace["overrides"])
+
+    # Delete the results but keep the run directory, which is what losing an
+    # unsynced results folder looks like.
+    import shutil
+    shutil.rmtree(workspace["results"] / "federated" / "smoke")
+
+    started = time.time()
+    result = run_script(*common, "--set", "federated.rounds=2", *workspace["overrides"])
+    elapsed = time.time() - started
+
+    history = pd.read_csv(workspace["results"] / "federated" / "smoke" / "history.csv")
+    assert list(history["round"]) == [1, 2]
+    assert "round   1/2" not in result.stdout  # no round was trained again
+    # Evaluation only, so this is far quicker than the two rounds it replaces.
+    assert elapsed < 120, f"took {elapsed:.0f}s, which suggests it retrained"
 
 
 @pytest.mark.slow
