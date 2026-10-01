@@ -119,25 +119,54 @@ def _draw_axis_break(ax) -> None:
     ax.plot([-0.012, 0.012], [0.016, 0.036], **kwargs)
 
 
+def heterogeneity_sweep(table: pd.DataFrame) -> pd.DataFrame:
+    """The rows of the main table that belong on an accuracy against alpha plot.
+
+    One configuration per strategy and alpha: the one run over the most seeds.
+    That drops the single seed runs of the mu selection sweep and the legacy
+    reproduction, which start from a different initialization and would
+    otherwise be joined into the same line as if they were points on a curve.
+    """
+    sweep = table[table["alpha"].notna()]
+    if "init" in sweep.columns:
+        sweep = sweep[sweep["init"] != "checkpoint"]
+    sweep = sweep.sort_values(["n_seeds", "label"]).groupby(["strategy", "alpha"]).tail(1)
+    return sweep.sort_values(["strategy", "alpha"]).reset_index(drop=True)
+
+
 def accuracy_vs_heterogeneity(
     table: pd.DataFrame,
     out_dir: str | Path,
     name: str = "fig3b_accuracy_vs_alpha",
 ) -> list[Path]:
-    """Test accuracy against Dirichlet alpha, one line per strategy."""
+    """Test accuracy against Dirichlet alpha, one line per strategy.
+
+    Points are the mean over seeds and bars one standard deviation. The
+    centralized and IID results, which have no alpha, are drawn as horizontal
+    reference lines.
+    """
     apply_style()
     fig, ax = plt.subplots(figsize=(4.2, 3.0))
 
-    for strategy, group in table[table["alpha"].notna()].groupby("strategy"):
+    references = (("centralized", "centralized", "--"), ("fedavg IID", "fedavg IID", ":"))
+    for label, legend, style in references:
+        row = table[table["label"] == label]
+        if not row.empty:
+            ax.axhline(100 * row["accuracy_mean"].iloc[0], color="0.3", linestyle=style,
+                       linewidth=1, label=legend)
+
+    for strategy, group in heterogeneity_sweep(table).groupby("strategy"):
         group = group.sort_values("alpha")
         color = METHOD_COLORS.get(str(strategy), PALETTE[0])
-        values = 100 * group["accuracy_point"].to_numpy()
-        low = 100 * group["accuracy_ci_low"].to_numpy()
-        high = 100 * group["accuracy_ci_high"].to_numpy()
+        label = str(strategy)
+        if strategy == "fedprox":
+            mus = sorted(group["mu"].dropna().unique())
+            if len(mus) == 1:
+                label += f" (mu={mus[0]:g})"
         ax.errorbar(
-            group["alpha"], values,
-            yerr=np.vstack([values - low, high - values]),
-            marker="o", markersize=4, capsize=3, label=str(strategy), color=color,
+            group["alpha"], 100 * group["accuracy_mean"],
+            yerr=100 * group["accuracy_std"].fillna(0),
+            marker="o", markersize=4, capsize=3, label=label, color=color,
         )
 
     ax.set_xscale("log")

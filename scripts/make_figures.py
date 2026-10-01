@@ -245,7 +245,8 @@ def main() -> int:
         paths = accuracy_vs_heterogeneity(table, figures_dir)
         figure_notes.append(("fig3b_accuracy_vs_alpha", paths[0],
                              "results/tables/main_results_raw.csv",
-                             "Test accuracy against Dirichlet alpha, log x axis."))
+                             "Test accuracy against Dirichlet alpha, log x axis. Mean over seeds, bars are "
+                             "one standard deviation. Only the multi seed configuration at each alpha."))
 
     for history_path in sorted(results_dir.glob("centralized/seed*/history.csv")):
         seed = history_path.parent.name
