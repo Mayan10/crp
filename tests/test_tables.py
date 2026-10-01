@@ -163,6 +163,26 @@ def test_pairwise_significance_detects_a_real_difference(tmp_path):
     assert row["significant_at_0.05"]
 
 
+def test_pairwise_significance_pairs_runs_from_the_same_seed(tmp_path):
+    y_true = [0] * 100
+    # Seed 0 runs agree exactly; the seed 2 run of the first configuration is
+    # much worse. A seed 0 comparison must not pick up the seed 2 run.
+    write_run(tmp_path, "federated", "fedavg_seed0", y_true, [0] * 100,
+              config={"strategy": "fedavg", "scheme": "iid", "seed": 0})
+    write_run(tmp_path, "federated", "fedavg_seed2", y_true, [1] * 50 + [0] * 50,
+              config={"strategy": "fedavg", "scheme": "iid", "seed": 2})
+    write_run(tmp_path, "federated", "fedprox_seed0", y_true, [0] * 100,
+              config={"strategy": "fedprox", "scheme": "dirichlet", "alpha": 0.1,
+                      "mu": 0.01, "seed": 0})
+
+    runs = discover_runs(tmp_path)
+    result = pairwise_significance(runs, [("fedavg IID", "fedprox alpha=0.1 mu=0.01")])
+    row = result.iloc[0]
+    assert row["seed"] == 0
+    assert row["accuracy_a"] == 1.0
+    assert row["n_discordant"] == 0
+
+
 def test_save_table_writes_csv_and_markdown(tmp_path):
     table = pd.DataFrame({"configuration": ["centralized"], "accuracy": [0.9912]})
     csv_path, md_path = save_table(table, tmp_path, "demo")

@@ -165,17 +165,26 @@ def pairwise_significance(
     runs: pd.DataFrame,
     comparisons: Iterable[tuple[str, str]],
 ) -> pd.DataFrame:
-    """McNemar's test for named pairs of configurations, on identical test sets."""
+    """McNemar's test for named pairs of configurations, on identical test sets.
+
+    The two runs compared are always from the same seed, the lowest one both
+    configurations have. Seeds fix the client partition, so pairing a seed 0
+    run with a seed 2 run would mix the effect of the method with the effect
+    of a different partition.
+    """
     runs = runs.copy()
     runs["label"] = runs.apply(configuration_label, axis=1)
-    lookup = {row["label"]: row for _, row in runs.sort_values("seed").iterrows()}
 
     rows = []
     for left, right in comparisons:
-        if left not in lookup or right not in lookup:
+        left_runs = runs[runs["label"] == left]
+        right_runs = runs[runs["label"] == right]
+        shared = sorted(set(left_runs["seed"].dropna()) & set(right_runs["seed"].dropna()))
+        if not shared:
             continue
-        a = pd.read_csv(lookup[left]["predictions_path"])
-        b = pd.read_csv(lookup[right]["predictions_path"])
+        seed = shared[0]
+        a = pd.read_csv(left_runs[left_runs["seed"] == seed].iloc[0]["predictions_path"])
+        b = pd.read_csv(right_runs[right_runs["seed"] == seed].iloc[0]["predictions_path"])
         if not a["path"].equals(b["path"]):
             merged = a.merge(b, on="path", suffixes=("_a", "_b"))
             y_true = merged["y_true_a"].to_numpy()
@@ -189,6 +198,7 @@ def pairwise_significance(
             {
                 "model_a": left,
                 "model_b": right,
+                "seed": int(seed),
                 "accuracy_a": float((y_true == pred_a).mean()),
                 "accuracy_b": float((y_true == pred_b).mean()),
                 "only_a_correct": result["only_a_correct"],
