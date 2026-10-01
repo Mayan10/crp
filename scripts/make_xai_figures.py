@@ -1,7 +1,8 @@
 """Build the attribution grids and the failure case figure.
 
-Needs the trained checkpoints, so it runs after the grid and after
-scripts/run_xai.py.
+The attribution grids need the trained checkpoints, so this runs after the
+grid and after scripts/run_xai.py. The failure case figure is drawn from the
+maps run_xai.py saved, so `--failure-only` needs no checkpoints.
 
 Usage:
     python scripts/make_xai_figures.py --models centralized_seed0 fedprox_..._seed0
@@ -74,6 +75,53 @@ def short_labels(names: list[str]) -> list[str]:
     return short if len(set(short)) == len(short) else list(names)
 
 
+def failure_case_figure(
+    per_image: pd.DataFrame,
+    maps_dir: Path,
+    target_model: str,
+    methods: list[str],
+    root: Path,
+    figures_dir: Path,
+    image_size: int,
+    n: int = 6,
+) -> list[Path]:
+    """The images where the target model's attribution falls least on the leaf.
+
+    Images are ranked by the leaf energy ratio averaged over the methods, and
+    each panel is labelled with that same value. The maps are the saved ones
+    the metrics were computed on, read back by their position in the XAI
+    sample, so the figure needs no checkpoint and shows exactly what was scored.
+    """
+    subset = per_image[(per_image["model"] == target_model) & per_image["leaf_energy_ratio"].notna()]
+    if subset.empty:
+        raise ValueError(f"no per image metrics for {target_model!r}")
+    ranking = subset.groupby("path")["leaf_energy_ratio"].mean().nsmallest(n)
+
+    maps_by_method = []
+    for method in methods:
+        rows = per_image[(per_image["model"] == target_model) & (per_image["method"] == method)]
+        maps = np.load(maps_dir / f"{target_model}_{method}.npz")["maps"]
+        if len(rows) != len(maps):
+            raise ValueError(f"{len(rows)} metric rows but {len(maps)} saved maps for {method}")
+        position = {path: i for i, path in enumerate(rows["path"])}
+        maps_by_method.append([maps[position[path]].astype(np.float32) for path in ranking.index])
+
+    class_names = subset.drop_duplicates("path").set_index("path")["class_name"]
+    entries = []
+    for i, (path, ratio) in enumerate(ranking.items()):
+        entries.append(
+            {
+                "image": load_display_image(root / path, image_size),
+                "label": f"{class_names[path].split('___')[-1].replace('_', ' ')[:20]}\n"
+                         f"leaf {ratio:.2f}",
+                "maps": [method_maps[i] for method_maps in maps_by_method],
+            }
+        )
+    print(f"  lowest mean leaf energy ratios for {target_model}: "
+          + ", ".join(f"{v:.3f}" for v in ranking))
+    return attribution_grid(entries, figures_dir, "fig7_failure_cases", model_labels=list(methods))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/base.yaml")
@@ -81,6 +129,8 @@ def main() -> int:
                         help="run names, shown as rows in the order given")
     parser.add_argument("--methods", nargs="+", default=["gradcam", "smoothgrad"])
     parser.add_argument("--classes", nargs="+", default=REQUIRED_CLASSES)
+    parser.add_argument("--failure-only", action="store_true",
+                        help="only the failure case figure, from saved maps, no checkpoints needed")
     parser.add_argument("--set", nargs="*", default=[])
     args = parser.parse_args()
 
@@ -93,7 +143,7 @@ def main() -> int:
     sample = pd.read_csv(Path(cfg.data.splits_dir) / "xai_sample.csv")
 
     models = {}
-    for name in args.models:
+    for name in [] if args.failure_only else args.models:
         model = build_model(cfg.model.name, cfg.model.num_classes, pretrained=False)
         load_checkpoint(model, resolve_checkpoint(name, runs_dir), map_location=device)
         models[name] = model.to(device).eval()
@@ -113,7 +163,7 @@ def main() -> int:
     dataset = build_dataset(cfg.data.root, chosen, train=False, image_size=cfg.data.image_size)
     images = torch.stack([dataset[i][0] for i in range(len(chosen))]).to(device)
 
-    for method in args.methods:
+    for method in [] if args.failure_only else args.methods:
         entries = []
         maps_per_model = []
         for name, model in models.items():
@@ -143,51 +193,12 @@ def main() -> int:
 
     # Failure cases: the images where attribution falls least on the leaf.
     per_image_path = Path(cfg.results_dir) / "xai" / "per_image_metrics.csv"
-    if per_image_path.is_file() and len(models) > 0:
-        per_image = pd.read_csv(per_image_path)
-        target_model = args.models[-1]
-        subset = per_image[
-            (per_image["model"] == target_model) & per_image["leaf_energy_ratio"].notna()
-        ]
-        if not subset.empty:
-            worst_paths = (
-                subset.groupby("path")["leaf_energy_ratio"].mean().nsmallest(6).index.tolist()
-            )
-            worst = per_image[per_image["path"].isin(worst_paths)].drop_duplicates("path")
-            worst = worst.set_index("path").loc[worst_paths].reset_index()
-
-            worst_dataset = build_dataset(cfg.data.root, worst, train=False,
-                                          image_size=cfg.data.image_size)
-            worst_images = torch.stack(
-                [worst_dataset[i][0] for i in range(len(worst))]
-            ).to(device)
-
-            model = models[target_model]
-            entries = []
-            method_maps = [
-                attribute(model, worst_images, predicted_classes(model, worst_images), method,
-                          image_size=cfg.data.image_size,
-                          n_samples=cfg.xai.smoothgrad_samples,
-                          noise_fraction=cfg.xai.smoothgrad_noise_fraction)
-                for method in args.methods
-            ]
-            for i, row in enumerate(worst.itertuples()):
-                entries.append(
-                    {
-                        "image": load_display_image(root / row.path, cfg.data.image_size),
-                        "label": f"{row.class_name.split('___')[-1].replace('_', ' ')[:20]}\n"
-                                 f"leaf {row.leaf_energy_ratio:.2f}",
-                        "maps": [m[i] for m in method_maps],
-                    }
-                )
-            paths = attribution_grid(
-                entries, figures_dir, "fig7_failure_cases",
-                model_labels=list(args.methods),
-            )
-            print(f"wrote {paths[0]}")
-            print(f"  worst leaf energy ratios for {target_model}: "
-                  + ", ".join(f"{v:.3f}" for v in
-                              subset.groupby('path')['leaf_energy_ratio'].mean().nsmallest(6)))
+    if per_image_path.is_file():
+        paths = failure_case_figure(
+            pd.read_csv(per_image_path), Path(cfg.results_dir) / "xai" / "maps",
+            args.models[-1], args.methods, root, figures_dir, cfg.data.image_size,
+        )
+        print(f"wrote {paths[0]}")
 
     return 0
 

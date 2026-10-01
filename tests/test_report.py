@@ -266,3 +266,43 @@ def test_figure_row_labels_never_collide():
     colliding = ["probe_a", "probe_b"]
     assert short_label("probe_a") == short_label("probe_b")
     assert short_labels(colliding) == colliding
+
+
+def test_failure_cases_show_and_label_the_ranked_model(tmp_path, monkeypatch):
+    """Each panel must carry the target model's own score, not another model's."""
+    import numpy as np
+    from PIL import Image
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import make_xai_figures
+
+    paths = [f"color/A___spot/img{i}.JPG" for i in range(3)]
+    for path in paths:
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (32, 32), "green").save(tmp_path / path)
+
+    rows = []
+    for model, ratios in (("other", [0.9, 0.1, 0.5]), ("target", [0.3, 0.8, 0.2])):
+        for method in ("gradcam", "smoothgrad"):
+            for path, ratio in zip(paths, ratios):
+                rows.append({"model": model, "method": method, "path": path,
+                             "class_name": "A___spot", "leaf_energy_ratio": ratio})
+    per_image = pd.DataFrame(rows)
+
+    maps_dir = tmp_path / "maps"
+    maps_dir.mkdir()
+    for method in ("gradcam", "smoothgrad"):
+        maps = np.stack([np.full((32, 32), i / 10) for i in range(3)]).astype(np.float16)
+        np.savez_compressed(maps_dir / f"target_{method}.npz", maps=maps)
+
+    captured = {}
+    monkeypatch.setattr(make_xai_figures, "attribution_grid",
+                        lambda entries, *a, **k: captured.setdefault("entries", entries) and [])
+
+    make_xai_figures.failure_case_figure(
+        per_image, maps_dir, "target", ["gradcam", "smoothgrad"], tmp_path, tmp_path, 32, n=2,
+    )
+    entries = captured["entries"]
+    assert [e["label"].split("\n")[1] for e in entries] == ["leaf 0.20", "leaf 0.30"]
+    # The lowest ranked image is the third in the sample, so its saved map is the third one.
+    assert np.allclose(entries[0]["maps"][0], 0.2, atol=1e-3)
