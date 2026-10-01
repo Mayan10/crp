@@ -80,6 +80,12 @@ XAI_METRICS = (
     "topk_iou_vs_centralized",
 )
 
+# Mask areas, the chance level for the energy ratio and pointing game: a map
+# that highlights nothing in particular puts this share of its mass, and its
+# peak, inside the mask. Summarized alongside the metrics but never tested,
+# since they are properties of the images and identical for every model.
+CHANCE_LEVELS = ("leaf_area_fraction", "lesion_area_fraction")
+
 
 def summarize_xai(per_image: pd.DataFrame, n_resamples: int = 1000, seed: int = 42) -> pd.DataFrame:
     """Mean and 95 percent bootstrap interval per model, method and metric.
@@ -91,7 +97,7 @@ def summarize_xai(per_image: pd.DataFrame, n_resamples: int = 1000, seed: int = 
     rows = []
     for (method, model), group in per_image.groupby(["method", "model"], sort=True):
         record = {"method": method, "model": model, "n_images": int(len(group))}
-        for metric in XAI_METRICS:
+        for metric in XAI_METRICS + CHANCE_LEVELS:
             if metric not in group.columns:
                 continue
             values = pd.to_numeric(group[metric], errors="coerce").dropna().to_numpy(dtype=float)
