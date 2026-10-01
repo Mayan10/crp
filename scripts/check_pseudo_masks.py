@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO))
 from fedxcrop.config import load_config
 from fedxcrop.data.splits import load_split
 from fedxcrop.xai.masks import healthy_hue_range, lesion_pseudo_mask, load_mapping, save_hue_range
-from fedxcrop.viz.xai_figures import load_display_image, pseudo_mask_grid
+from fedxcrop.viz.xai_figures import load_display_image, panel_label, pseudo_mask_grid
 
 
 def main() -> int:
@@ -73,7 +73,7 @@ def main() -> int:
             {
                 "image": load_display_image(root / row.path, cfg.data.image_size),
                 "mask": mask,
-                "label": row.class_name.replace("___", " ").replace("_", " ")[:26],
+                "label": panel_label(row.class_name),
             }
         )
 

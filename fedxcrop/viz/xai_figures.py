@@ -27,6 +27,21 @@ def load_display_image(path: str | Path, image_size: int = 224) -> np.ndarray:
 PANEL_INCHES = 1.15
 
 
+def panel_label(class_name: str, width: int = 22) -> str:
+    """Crop on the first line, the condition wrapped below it.
+
+    A single line title truncated to a fixed length ran into its neighbours
+    in a six column grid and cut names mid word.
+    """
+    import textwrap
+
+    crop, _, condition = class_name.partition("___")
+    crop = crop.replace("_", " ").replace(",", "")
+    condition = condition.replace("_", " ").strip()
+    lines = [crop] + textwrap.wrap(condition, width=width, max_lines=2, placeholder="...")
+    return "\n".join(lines)
+
+
 def pseudo_mask_grid(
     rows: list[dict],
     out_dir: str | Path,
@@ -45,7 +60,7 @@ def pseudo_mask_grid(
     grid_rows = int(np.ceil(n / columns))
     fig, axes = plt.subplots(
         grid_rows, columns,
-        figsize=(panel_inches * columns, (panel_inches + 0.15) * grid_rows),
+        figsize=(panel_inches * columns, (panel_inches + 0.45) * grid_rows),
     )
     axes = np.atleast_1d(axes).reshape(-1)
 
@@ -55,7 +70,8 @@ def pseudo_mask_grid(
         overlay[row["mask"].astype(bool)] = [1.0, 0.0, 0.0, 0.45]
         ax.imshow(overlay)
         coverage = 100 * float(row["mask"].astype(bool).mean())
-        ax.set_title(f"{row['label']}\n{coverage:.0f} percent", fontsize=5.5, pad=2)
+        ax.set_title(f"{row['label']}\n{coverage:.0f} percent of image", fontsize=5.5, pad=2,
+                     linespacing=1.1)
         ax.axis("off")
 
     for ax in axes[n:]:

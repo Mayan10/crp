@@ -22,3 +22,14 @@ def test_heterogeneity_sweep_keeps_one_multi_seed_row_per_point():
     )
     sweep = heterogeneity_sweep(table)
     assert list(sweep["label"]) == ["fedavg alpha=0.5", "fedprox alpha=0.1 mu=0.001"]
+
+
+def test_panel_labels_wrap_instead_of_truncating():
+    from fedxcrop.viz.xai_figures import panel_label
+
+    label = panel_label("Tomato___Spider_mites Two-spotted_spider_mite")
+    lines = label.split("\n")
+    assert lines[0] == "Tomato"
+    assert all(len(line) <= 22 for line in lines[1:])
+    assert "Spider mites" in label
+    assert panel_label("Pepper,_bell___Bacterial_spot").split("\n") == ["Pepper bell", "Bacterial spot"]
