@@ -1,0 +1,21 @@
+{
+  "engine": "flower",
+  "best": {
+    "round": 29,
+    "val_accuracy": 0.9880294659300184
+  },
+  "rounds_completed": 30,
+  "n_parameters": 2272550,
+  "bytes_per_round": 90902000,
+  "total_bytes": 2727060000,
+  "client_sizes": {
+    "0": 8205,
+    "1": 10775,
+    "2": 6815,
+    "3": 8261,
+    "4": 9391
+  },
+  "strategy": "fedprox",
+  "mu": 0.001,
+  "init": "imagenet"
+}

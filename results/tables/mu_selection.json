@@ -1,0 +1,35 @@
+{
+  "selected_mu": 0.001,
+  "alpha": 0.1,
+  "seed": 0,
+  "criterion": "highest best validation accuracy, test not consulted",
+  "candidates": [
+    {
+      "run": "fedprox_dirichlet_alpha0.1_K5_mu0.001_seed0",
+      "mu": 0.001,
+      "best_val_accuracy": 0.980294659300184,
+      "best_val_macro_f1": 0.9733516275823484,
+      "best_round": 27,
+      "val_correct": 5323,
+      "val_total": 5430
+    },
+    {
+      "run": "fedprox_dirichlet_alpha0.1_K5_mu0.01_seed0",
+      "mu": 0.01,
+      "best_val_accuracy": 0.9773480662983426,
+      "best_val_macro_f1": 0.969800868729855,
+      "best_round": 30,
+      "val_correct": 5307,
+      "val_total": 5430
+    },
+    {
+      "run": "fedprox_dirichlet_alpha0.1_K5_mu0.1_seed0",
+      "mu": 0.1,
+      "best_val_accuracy": 0.9707182320441988,
+      "best_val_macro_f1": 0.9617485629063304,
+      "best_round": 30,
+      "val_correct": 5271,
+      "val_total": 5430
+    }
+  ]
+}

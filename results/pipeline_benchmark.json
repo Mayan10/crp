@@ -1,0 +1,15 @@
+{
+  "device": "cuda",
+  "cpus": 2,
+  "loader_workers": 2,
+  "batch_size": 32,
+  "images_per_second": {
+    "cpu_augment": 106.36890898756216,
+    "gpu_augment": 271.5635696018872
+  },
+  "speedup": 2.553035207248778,
+  "projected_minutes_per_epoch": {
+    "cpu_augment": 6.807597008928036,
+    "gpu_augment": 2.6664720445685086
+  }
+}

@@ -1,0 +1,4 @@
+run,mu,best_val_accuracy,best_val_macro_f1,best_round,val_correct,val_total
+fedprox_dirichlet_alpha0.1_K5_mu0.001_seed0,0.001,0.980294659300184,0.9733516275823484,27,5323,5430
+fedprox_dirichlet_alpha0.1_K5_mu0.01_seed0,0.01,0.9773480662983426,0.969800868729855,30,5307,5430
+fedprox_dirichlet_alpha0.1_K5_mu0.1_seed0,0.1,0.9707182320441988,0.9617485629063304,30,5271,5430

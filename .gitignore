@@ -8,3 +8,6 @@ __pycache__/
 .ipynb_checkpoints/
 .env
 kaggle.json
+
+# Attribution maps, tens of MB each
+results/xai/maps/

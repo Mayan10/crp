@@ -1,0 +1,21 @@
+{
+  "engine": "flower",
+  "best": {
+    "round": 16,
+    "val_accuracy": 0.9848987108655617
+  },
+  "rounds_completed": 30,
+  "n_parameters": 2272550,
+  "bytes_per_round": 90902000,
+  "total_bytes": 2727060000,
+  "client_sizes": {
+    "0": 7220,
+    "1": 10186,
+    "2": 7073,
+    "3": 7676,
+    "4": 11292
+  },
+  "strategy": "fedavg",
+  "mu": null,
+  "init": "imagenet"
+}

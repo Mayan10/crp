@@ -1,0 +1,21 @@
+{
+  "engine": "flower",
+  "best": {
+    "round": 4,
+    "val_accuracy": 0.9876611418047883
+  },
+  "rounds_completed": 5,
+  "n_parameters": 2272550,
+  "bytes_per_round": 90902000,
+  "total_bytes": 454510000,
+  "client_sizes": {
+    "0": 1160,
+    "1": 714,
+    "2": 1300,
+    "3": 1293,
+    "4": 533
+  },
+  "strategy": "fedavg",
+  "mu": null,
+  "init": "checkpoint"
+}

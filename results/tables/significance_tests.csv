@@ -1,0 +1,10 @@
+model_a,model_b,seed,accuracy_a,accuracy_b,only_a_correct,only_b_correct,n_discordant,test,p_value,significant_at_0.05
+fedprox alpha=0.1 mu=0.001,fedavg alpha=0.1,0,0.9813927781871776,0.9808400884303611,38,35,73,chi square with continuity correction,0.8149210911464686,False
+fedprox alpha=0.1 mu=0.01,fedavg alpha=0.1,0,0.9791820191599115,0.9808400884303611,37,46,83,chi square with continuity correction,0.3798818127990695,False
+fedprox alpha=0.1 mu=0.1,fedavg alpha=0.1,0,0.9740235814296242,0.9808400884303611,33,70,103,chi square with continuity correction,0.0003893704746372221,True
+fedprox alpha=0.5 mu=0.001,fedavg alpha=0.5,0,0.986551215917465,0.9863669859985261,18,17,35,chi square with continuity correction,1.0,False
+fedprox alpha=1 mu=0.001,fedavg alpha=1,0,0.9882092851879145,0.9893146647015475,13,19,32,chi square with continuity correction,0.3767591178115821,False
+fedavg IID,centralized,0,0.9889462048636699,0.993367722918202,8,32,40,chi square with continuity correction,0.00027623972394733953,True
+fedavg alpha=0.1,fedavg IID,0,0.9808400884303611,0.9889462048636699,28,72,100,chi square with continuity correction,1.7079810941983605e-05,True
+fedavg alpha=0.5,fedavg IID,0,0.9863669859985261,0.9889462048636699,28,42,70,chi square with continuity correction,0.12023280053681214,False
+fedavg alpha=1,fedavg IID,0,0.9893146647015475,0.9889462048636699,21,19,40,chi square with continuity correction,0.8743670611628918,False
